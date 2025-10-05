@@ -30,21 +30,76 @@ This project implements and compares various machine learning approaches to clas
 
 *Note: Results are based on 80-20 train-test split with stratification*
 
+### Performance Visualization
+
+![Model Comparison](results/figures/model_comparison.png)
+*Figure 1: Comparison of model accuracies across different datasets (from Summary of Methods slide)*
+
+![Confusion Matrix - DNN](results/figures/confusion_matrix_dnn.png)
+*Figure 2: Confusion matrix for Deep Neural Network on combined WGS PCAWG dataset (22 cancer types, 79.46% accuracy)*
+
+![Feature Importance](results/figures/feature_importance_gb.png)
+*Figure 3: Feature importance analysis showing C>T mutation channel as most predictive*
+
 ## 📊 Dataset
 
 ### Data Source
 Data from [Alexandrov et al. (2020) Nature](https://www.nature.com/articles/s41586-020-1943-3) - "The repertoire of mutational signatures in human cancer"
 
-### Data Types
-1. **Mutational Catalogs** (WGS/WES)
-   - 96 trinucleotide mutation channels
-   - PCAWG and TCGA datasets
-   
-2. **Signature Activities**
-   - 65 SBS mutational signatures
-   - Derived from NMF decomposition
+**Note**: The original datasets are not included in this repository due to size constraints. The data structure is described below for reproduction purposes.
 
-### Cancer Types
+### Data Structure
+
+```
+project_data/
+├── catalogs/
+│   ├── WGS/
+│   │   ├── WGS_PCAWG.96.csv          # 96 channels × 2780 samples
+│   │   └── WGS_Other.96.csv
+│   └── WES/
+│       ├── WES_TCGA.96.csv           # 96 channels × N samples
+│       └── WES_Other.96.csv
+└── activities/
+    ├── WGS/
+    │   ├── WGS_PCAWG.activities.csv  # 65 SBS signatures × 2780 samples
+    │   └── WGS_Other.activities.csv
+    └── WES/
+        ├── WES_TCGA.activities.csv   # 65 SBS signatures × N samples
+        └── WES_Other.activities.csv
+```
+
+#### Catalog File Format (e.g., WGS_PCAWG.96.csv)
+```
+Mutation type | Trinucleotide | Cancer-Type1::Sample1 | Cancer-Type1::Sample2 | ...
+C>A          | ACA           | 245                   | 187                   | ...
+C>A          | ACC           | 312                   | 298                   | ...
+...
+```
+- Rows: 96 mutation channels (6 base mutations × 16 trinucleotide contexts)
+- Columns: Sample IDs in format "CancerType::SampleID"
+- Values: Mutation counts
+
+#### Activity File Format (e.g., WGS_PCAWG.activities.csv)
+```
+Cancer Types | Sample Names | Accuracy | SBS1  | SBS2  | ... | SBS94
+Biliary-AdenoCA | SP117655  | 0.95     | 2456  | 123   | ... | 0
+...
+```
+- Rows: Individual samples
+- Columns: Cancer type, sample name, reconstruction accuracy, 65 SBS signature activities
+
+### Data Availability
+
+The original PCAWG data can be accessed through:
+1. **ICGC Data Portal**: [https://dcc.icgc.org/pcawg](https://dcc.icgc.org/pcawg)
+2. **Synapse**: Requires registration and data access approval
+3. **Supplementary materials** from [Alexandrov et al. 2020](https://www.nature.com/articles/s41586-020-1943-3)
+
+For TCGA data:
+- **GDC Data Portal**: [https://portal.gdc.cancer.gov/](https://portal.gdc.cancer.gov/)
+
+### Cancer Types Coverage
+
 - **WGS PCAWG**: 37 cancer types (2,780 samples)
 - **WES TCGA**: Multiple cancer types with varying sample sizes
 - After filtering (≥5 samples): 22 major cancer classes
@@ -55,23 +110,26 @@ Data from [Alexandrov et al. (2020) Nature](https://www.nature.com/articles/s415
 CancerTypeNet/
 ├── README.md
 ├── requirements.txt
+├── LICENSE
 ├── notebooks/
 │   ├── 01_CancerTypeNet_Main.ipynb          # Main analysis pipeline
 │   └── 02_Data_Exploration.ipynb            # EDA and visualization
-├── project_data/
+├── src/
+│   ├── data_preprocessing.py                # Data loading and preprocessing
+│   ├── models.py                            # Model architectures
+│   └── evaluation.py                        # Evaluation metrics and visualization
+├── project_data/                            # Data directory (not included in repo)
 │   ├── catalogs/
-│   │   ├── WGS/
-│   │   │   └── WGS_PCAWG.96.csv
-│   │   └── WES/
-│   │       └── WES_TCGA.96.csv
 │   └── activities/
-│       ├── WGS/
-│       │   └── WGS_PCAWG.activities.csv
-│       └── WES/
-│           └── WES_TCGA.activities.csv
 └── results/
-    ├── figures/
-    └── models/
+    ├── figures/                             # Generated figures
+    │   ├── model_comparison.png
+    │   ├── confusion_matrix_*.png
+    │   └── feature_importance_*.png
+    └── models/                              # Saved model checkpoints
+        ├── dnn_best.pth
+        ├── cnn_best.pth
+        └── model_metrics.json
 ```
 
 ## 🚀 Getting Started
@@ -97,18 +155,28 @@ cd CancerTypeNet
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Create necessary directories
+mkdir -p project_data/{catalogs/{WGS,WES},activities/{WGS,WES}}
+mkdir -p results/{figures,models}
 ```
+
+### Data Preparation
+
+1. Download the PCAWG/TCGA datasets following the instructions in the **Data Availability** section
+2. Place the CSV files in the corresponding directories under `project_data/`
+3. Verify data structure matches the format described above
 
 ### Quick Start
 
 ```python
 # Load and preprocess data
-from data_preprocessing import load_pcawg_data
+from src.data_preprocessing import load_pcawg_data
 
 catalogs, activities, cancer_types = load_pcawg_data()
 
 # Train a model
-from models import train_dnn
+from src.models import train_dnn
 
 model, accuracy = train_dnn(
     X=catalogs, 
@@ -119,6 +187,13 @@ model, accuracy = train_dnn(
 )
 
 print(f"Test Accuracy: {accuracy:.2%}")
+```
+
+### Running the Full Pipeline
+
+```bash
+# Run the main analysis notebook
+jupyter notebook notebooks/01_CancerTypeNet_Main.ipynb
 ```
 
 ## 🔬 Methodology
@@ -173,23 +248,35 @@ Conv1D(1→14→18→1) + Dropout
    - Larger cancer types (Liver-HCC, Kidney-RCC) achieve >80% accuracy
    - Rare cancer types show 0% accuracy without proper handling
 
+## 👥 Team Members
+
+This project was completed as a collaborative team effort with equal contributions from all members:
+
+- **Team Member 1**
+- **Xiaoyu Yuan** - [xiaoyuyuan19@gmail.com](mailto:xiaoyuyuan19@gmail.com)
+- **Team Member 3**
+- **Team Member 4**
+
+*All team members contributed equally to data analysis, model implementation, and manuscript preparation.*
+
 ## 🎓 Course Information
 
 **Course**: Machine Learning in Molecular Biosciences (LSI31003)  
 **Institution**: University of Helsinki  
 **Date**: March 2024  
-**Team Project**: Group collaboration
+**Type**: Group Course Project
 
 ## 📝 Citation
 
 If you use this work, please cite:
 
 ```bibtex
-@misc{yuan2024cancertypenet,
+@misc{cancertypenet2024,
   title={CancerTypeNet: Tumor Type Classification from Mutational Signatures},
-  author={Yuan, Xiaoyu and Team Members},
+  author={Team Members and Yuan, Xiaoyu},
   year={2024},
-  institution={University of Helsinki}
+  institution={University of Helsinki},
+  note={Course project for Machine Learning in Molecular Biosciences}
 }
 ```
 
@@ -212,13 +299,14 @@ If you use this work, please cite:
 - [COSMIC Mutational Signatures](https://cancer.sanger.ac.uk/cosmic/signatures)
 - [PCAWG Project](https://dcc.icgc.org/pcawg)
 - [Original Paper](https://www.nature.com/articles/s41586-020-1943-3)
+- [GDC Data Portal](https://portal.gdc.cancer.gov/)
 
 ## 📧 Contact
 
 **Xiaoyu Yuan**  
-📧 xiaoyuyuan19@gmail.com  
-🌐 [Portfolio](https://xiaoyuyuan19.github.io/portfolio/)  
-💼 [LinkedIn](http://www.linkedin.com/in/xiaoyuyuan19)
+Email: xiaoyuyuan19@gmail.com  
+Portfolio: [xiaoyuyuan19.github.io/portfolio](https://xiaoyuyuan19.github.io/portfolio/)  
+LinkedIn: [linkedin.com/in/xiaoyuyuan19](http://www.linkedin.com/in/xiaoyuyuan19)
 
 ## 📄 License
 
@@ -226,9 +314,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Course instructors and teaching assistants
-- PCAWG Consortium for providing the data
-- Team members for collaboration and insights
+- Course instructors and teaching assistants at University of Helsinki
+- PCAWG Consortium for providing the mutational signature data
+- All team members for their equal contributions and collaboration
 
 ---
 
